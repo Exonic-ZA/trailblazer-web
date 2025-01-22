@@ -58,6 +58,8 @@ import SharePage from './settings/SharePage';
 import AnnouncementPage from './settings/AnnouncementPage';
 import EmulatorPage from './other/EmulatorPage';
 import Loader from './common/components/Loader';
+import ImagesPage from './settings/ImagesPage';
+import ImagePage from './settings/ImagePage';
 
 const Navigation = () => {
   const navigate = useNavigate();
@@ -152,6 +154,8 @@ const Navigation = () => {
           <Route path="user/:id/connections" element={<UserConnectionsPage />} />
           <Route path="user/:id" element={<UserPage />} />
           <Route path="user" element={<UserPage />} />
+          <Route path="images" element={<ImagesPage />} />
+          <Route path="images/:id" element={<ImagePage />} />
         </Route>
 
         <Route path="reports">

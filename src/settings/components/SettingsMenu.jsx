@@ -15,6 +15,7 @@ import PublishIcon from '@mui/icons-material/Publish';
 import SmartphoneIcon from '@mui/icons-material/Smartphone';
 import HelpIcon from '@mui/icons-material/Help';
 import CampaignIcon from '@mui/icons-material/Campaign';
+import ImageIcon from '@mui/icons-material/Image';
 import { useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import { useTranslation } from '../../common/components/LocalizationProvider';
@@ -58,6 +59,12 @@ const SettingsMenu = () => {
               link={`/settings/user/${userId}`}
               icon={<PersonIcon />}
               selected={location.pathname === `/settings/user/${userId}`}
+            />
+            <MenuItem
+              title={t('settingsImages')}
+              link={`/settings/images`}
+              icon={<ImageIcon />}
+              selected={location.pathname === `/settings/images`}
             />
             <MenuItem
               title={t('deviceTitle')}
