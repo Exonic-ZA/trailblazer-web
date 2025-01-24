@@ -9,6 +9,7 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import RouteIcon from '@mui/icons-material/Route';
+import ImageIcon from '@mui/icons-material/Image';
 import EventRepeatIcon from '@mui/icons-material/EventRepeat';
 import NotesIcon from '@mui/icons-material/Notes';
 import { useLocation } from 'react-router-dom';
@@ -37,6 +38,12 @@ const ReportsMenu = () => {
           link="/reports/route"
           icon={<TimelineIcon />}
           selected={location.pathname === '/reports/route'}
+        />
+        <MenuItem
+          title={t('reportImages')}
+          link={`/reports/images`}
+          icon={<ImageIcon />}
+          selected={location.pathname === `/reports/images`}
         />
         <MenuItem
           title={t('reportEvents')}
