@@ -1,150 +1,166 @@
 import React, { useState } from 'react';
-
 import {
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
-  Typography,
-  FormControlLabel,
-  Checkbox,
-  FormGroup,
-  Button,
-  TextField,
+  Container, Box, TextField, Button, Typography,
 } from '@mui/material';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useTranslation, useTranslationKeys } from '../common/components/LocalizationProvider';
+import { DropzoneArea } from 'react-mui-dropzone';
+import { useTranslation } from '../common/components/LocalizationProvider';
 import EditItemView from './components/EditItemView';
-import { prefixString, unprefixString } from '../common/util/stringUtils';
-import SelectField from '../common/components/SelectField';
 import SettingsMenu from './components/SettingsMenu';
-import { useCatch } from '../reactHelper';
 import useSettingsStyles from './common/useSettingsStyles';
 
-const NotificationPage = () => {
+const ImagePage = () => {
   const classes = useSettingsStyles();
   const t = useTranslation();
 
   const [item, setItem] = useState();
-
-  const alarms = useTranslationKeys((it) => it.startsWith('alarm')).map((it) => ({
-    key: unprefixString('alarm', it),
-    name: t(it),
-  }));
-
-  const testNotificators = useCatch(async () => {
-    await Promise.all(item.notificators.split(/[, ]+/).map(async (notificator) => {
-      const response = await fetch(`/api/notifications/test/${notificator}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(item),
-      });
-      if (!response.ok) {
-        throw Error(await response.text());
-      }
-    }));
-  });
+  const [file, setFile] = useState(null);
+  const [fileName, setFileName] = useState('');
+  const [fileExtension, setFileExtension] = useState('');
+  const [deviceId, setDeviceId] = useState('');
+  const [latitude, setLatitude] = useState('');
+  const [longitude, setLongitude] = useState('');
+  const [imageId, setImageId] = useState(null);
+  const [error, setError] = useState('');
 
   const validate = () => item && item.type && item.notificators && (!item.notificators?.includes('command') || item.commandId);
 
+  const handleFileChange = (event) => {
+    const selectedFile = event.target.files[0];
+    setFile(selectedFile);
+    const nameWithoutExtension = selectedFile.name.split('.').slice(0, -1).join('.');
+    setFileName(nameWithoutExtension);
+    setFileExtension(selectedFile.name.split('.').pop());
+  };
+
+  const handleMetadataUpload = async () => {
+    const metadata = {
+      fileName,
+      fileExtension,
+      deviceId,
+      latitude,
+      longitude,
+    };
+
+    try {
+      const response = await fetch('/api/images', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(metadata),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setImageId(data.id);
+        console.log('Metadata upload successful:', data);
+        setError(''); // Clear any previous errors
+      } else {
+        const errorMessage = await response.text();
+        console.error('Metadata upload failed:', errorMessage);
+        setError(`Metadata upload failed: ${errorMessage}`);
+      }
+    } catch (error) {
+      console.error('Error uploading metadata:', error);
+      setError(`Error uploading metadata: ${error.message}`);
+    }
+  };
+
+  const handleFileUpload = async (files) => {
+    if (!files.length || !imageId) return;
+
+    const selectedFile = files[0];
+    console.log('Uploading new file:', selectedFile, imageId, fileExtension);
+
+    try {
+      const response = await fetch(`/api/images/${imageId}/upload`, {
+        method: 'POST',
+        body: selectedFile,
+      });
+
+      if (response.ok) {
+        console.log('File upload successful:', await response.text());
+        setError(''); // Clear any previous errors
+      } else {
+        const errorMessage = await response.text();
+        console.error('File upload failed:', errorMessage);
+        setError(`File upload failed: ${errorMessage}`);
+      }
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      setError(`Error uploading file: ${error.message}`);
+    }
+  };
+
   return (
     <EditItemView
-      endpoint="notifications"
+      endpoint="images"
       item={item}
       setItem={setItem}
       validate={validate}
       menu={<SettingsMenu />}
-      breadcrumbs={['settingsTitle', 'sharedNotification']}
+      breadcrumbs={['settingsTitle', 'sharedImage']}
     >
       {item && (
         <>
-          <Accordion defaultExpanded>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">
-                {t('sharedRequired')}
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails className={classes.details}>
-              <SelectField
-                value={item.type}
-                onChange={(e) => setItem({ ...item, type: e.target.value })}
-                endpoint="/api/notifications/types"
-                keyGetter={(it) => it.type}
-                titleGetter={(it) => t(prefixString('event', it.type))}
-                label={t('sharedType')}
-              />
-              {item.type === 'alarm' && (
-                <SelectField
-                  multiple
-                  value={item.attributes && item.attributes.alarms ? item.attributes.alarms.split(/[, ]+/) : []}
-                  onChange={(e) => setItem({ ...item, attributes: { ...item.attributes, alarms: e.target.value.join() } })}
-                  data={alarms}
-                  keyGetter={(it) => it.key}
-                  label={t('sharedAlarms')}
-                />
-              )}
-              <SelectField
-                multiple
-                value={item.notificators ? item.notificators.split(/[, ]+/) : []}
-                onChange={(e) => setItem({ ...item, notificators: e.target.value.join() })}
-                endpoint="/api/notifications/notificators"
-                keyGetter={(it) => it.type}
-                titleGetter={(it) => t(prefixString('notificator', it.type))}
-                label={t('notificationNotificators')}
-              />
-              {item.notificators?.includes('command') && (
-                <SelectField
-                  value={item.commandId}
-                  onChange={(e) => setItem({ ...item, commandId: Number(e.target.value) })}
-                  endpoint="/api/commands"
-                  titleGetter={(it) => it.description}
-                  label={t('sharedSavedCommand')}
-                />
-              )}
-              <Button
-                variant="outlined"
-                color="primary"
-                onClick={testNotificators}
-                disabled={!item.notificators}
-              >
-                {t('sharedTestNotificators')}
-              </Button>
-              <FormGroup>
-                <FormControlLabel
-                  control={(
-                    <Checkbox
-                      checked={item.always}
-                      onChange={(e) => setItem({ ...item, always: e.target.checked })}
-                    />
-                    )}
-                  label={t('notificationAlways')}
-                />
-              </FormGroup>
-            </AccordionDetails>
-          </Accordion>
-          <Accordion>
-            <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">
-                {t('sharedExtra')}
-              </Typography>
-            </AccordionSummary>
-            <AccordionDetails className={classes.details}>
+          <Container>
+            <Box display="flex" flexDirection="column" alignItems="center" my={4}>
               <TextField
-                value={item.description || ''}
-                onChange={(e) => setItem({ ...item, description: e.target.value })}
-                label={t('sharedDescription')}
+                type="file"
+                onChange={handleFileChange}
+                variant="outlined"
+                margin="normal"
               />
-              <SelectField
-                value={item.calendarId}
-                onChange={(e) => setItem({ ...item, calendarId: Number(e.target.value) })}
-                endpoint="/api/calendars"
-                label={t('sharedCalendar')}
+              <TextField
+                label="Device ID"
+                value={deviceId}
+                onChange={(e) => setDeviceId(e.target.value)}
+                variant="outlined"
+                margin="normal"
               />
-            </AccordionDetails>
-          </Accordion>
+              <TextField
+                label="Latitude"
+                value={latitude}
+                onChange={(e) => setLatitude(e.target.value)}
+                variant="outlined"
+                margin="normal"
+              />
+              <TextField
+                label="Longitude"
+                value={longitude}
+                onChange={(e) => setLongitude(e.target.value)}
+                variant="outlined"
+                margin="normal"
+              />
+              <Button
+                variant="contained"
+                color="primary"
+                onClick={handleMetadataUpload}
+                disabled={!fileName || !fileExtension || !deviceId || !latitude || !longitude}
+              >
+                Upload Metadata
+              </Button>
+              {imageId && (
+                <DropzoneArea
+                  dropzoneText="Drag and drop an image here or click"
+                  acceptedFiles={['image/*']}
+                  filesLimit={1}
+                  onChange={handleFileUpload}
+                  showAlerts={false}
+                  maxFileSize={500000}
+                />
+              )}
+              {error && (
+                <Typography color="error" variant="body2" style={{ marginTop: '16px' }}>
+                  {error}
+                </Typography>
+              )}
+            </Box>
+          </Container>
         </>
       )}
     </EditItemView>
   );
 };
 
-export default NotificationPage;
+export default ImagePage;
