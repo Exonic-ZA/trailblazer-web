@@ -114,7 +114,7 @@ const ImagesPage = () => {
       };
   
     return (
-      <PageLayout menu={<ReportsMenu />} breadcrumbs={['ReportTitle', 'sharedimages']}>
+      <PageLayout menu={<ReportsMenu />} breadcrumbs={['reportTitle', 'sharedimages']}>
         
         <Container>
         <Box display="flex" justifyContent="flex-start" flexWrap="wrap" my={2}>
