@@ -155,7 +155,8 @@ const Navigation = () => {
           <Route path="user/:id" element={<UserPage />} />
           <Route path="user" element={<UserPage />} />
           <Route path="images" element={<ImagesPage />} />
-          <Route path="images/:id" element={<ImagePage />} />
+          <Route path="image/:id" element={<ImagePage />} />
+          <Route path="image" element={<ImagePage />} />
         </Route>
 
         <Route path="reports">

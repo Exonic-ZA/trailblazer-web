@@ -64,7 +64,7 @@ const SettingsMenu = () => {
               title={t('settingsImages')}
               link={`/settings/images`}
               icon={<ImageIcon />}
-              selected={location.pathname === `/settings/images`}
+              selected={location.pathname === `/settings/image`}
             />
             <MenuItem
               title={t('deviceTitle')}

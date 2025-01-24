@@ -15,24 +15,6 @@ import TableShimmer from '../common/components/TableShimmer';
 import SearchHeader, { filterByKeyword } from './components/SearchHeader';
 import useSettingsStyles from './common/useSettingsStyles';
 
-const images = [
-  {
-    title: 'Image 1',
-    description: 'This is the first image',
-    url: 'https://via.placeholder.com/150',
-  },
-  {
-    title: 'Image 2',
-    description: 'This is the second image',
-    url: 'https://via.placeholder.com/150',
-  },
-  {
-    title: 'Image 3',
-    description: 'This is the third image',
-    url: 'https://via.placeholder.com/150',
-  },
-];
-
 const ImagesPage = () => {
     const classes = useSettingsStyles();
     const t = useTranslation();
@@ -43,39 +25,31 @@ const ImagesPage = () => {
     const [loading, setLoading] = useState(false);
 
     const [device, setDevice] = useState('');
-    const [period, setPeriod] = useState('');
-    const [eventType, setEventType] = useState('');
-    const [column, setColumn] = useState('');
 
     const handleDeviceChange = (event) => {
         setDevice(event.target.value);
     };
-
-    const handlePeriodChange = (event) => {
-        setPeriod(event.target.value);
-    };
-
-    const handleEventTypeChange = (event) => {
-        setEventType(event.target.value);
-    };
-
-    const handleColumnChange = (event) => {
-        setColumn(event.target.value);
-    };
     
-    // useEffectAsync(async () => {
-    //   setLoading(true);
-    //   try {
-    //     const response = await fetch('/api/images');
-    //     if (response.ok) {
-    //       setItems(await response.json());
-    //     } else {
-    //       throw Error(await response.text());
-    //     }
-    //   } finally {
-    //     setLoading(false);
-    //   }
-    // }, [timestamp]);
+    useEffectAsync(async () => {
+        setLoading(true);
+        try {
+          const response = await fetch('/api/images');
+          if (response.ok) {
+            const data = await response.json();
+            console.log('API response:', data);
+            setItems(data);
+          } else {
+            throw Error(await response.text());
+          }
+        } finally {
+          setLoading(false);
+        }
+      }, [timestamp]);
+
+      // Get list of devices from server
+      // Display the device unique identifier to the user
+      // When the user selects a device, it uses the device id connected to it to filter by that device
+      // Also display the device identifier in place of the device id on the image list
   
     const formatList = (prefix, value) => {
       if (value) {
@@ -93,84 +67,20 @@ const ImagesPage = () => {
         <SearchHeader keyword={searchKeyword} setKeyword={setSearchKeyword} />
         
         <Container>
-            <Box display="flex" justifyContent="space-around" flexWrap="wrap" my={2}>
-                <Box mx={0.5} my={1}>
-                <FormControl variant="outlined" sx={{ minWidth: 200 }} fullWidth>
-                    <InputLabel id="device-label">Device</InputLabel>
-                    <Select
-                    labelId="device-label"
-                    id="device-select"
-                    value={device}
-                    onChange={handleDeviceChange}
-                    label="Device"
-                    >
-                    <MenuItem value="">
-                        <em>None</em>
-                    </MenuItem>
-                    <MenuItem value="device1">Device 1</MenuItem>
-                    <MenuItem value="device2">Device 2</MenuItem>
-                    <MenuItem value="device3">Device 3</MenuItem>
-                    </Select>
-                </FormControl>
-                </Box>
-                <Box mx={0.5} my={1}>
-                <FormControl variant="outlined" sx={{ minWidth: 200 }} fullWidth>
-                    <InputLabel id="period-label">Period</InputLabel>
-                    <Select
-                    labelId="period-label"
-                    id="period-select"
-                    value={period}
-                    onChange={handlePeriodChange}
-                    label="Period"
-                    >
-                    <MenuItem value="">
-                        <em>None</em>
-                    </MenuItem>
-                    <MenuItem value="period1">Period 1</MenuItem>
-                    <MenuItem value="period2">Period 2</MenuItem>
-                    <MenuItem value="period3">Period 3</MenuItem>
-                    </Select>
-                </FormControl>
-                </Box>
-                <Box mx={0.5} my={1}>
-                <FormControl variant="outlined" sx={{ minWidth: 200 }} fullWidth>
-                    <InputLabel id="event-type-label">Event Type</InputLabel>
-                    <Select
-                    labelId="event-type-label"
-                    id="event-type-select"
-                    value={eventType}
-                    onChange={handleEventTypeChange}
-                    label="Event Type"
-                    >
-                    <MenuItem value="">
-                        <em>None</em>
-                    </MenuItem>
-                    <MenuItem value="event1">Event 1</MenuItem>
-                    <MenuItem value="event2">Event 2</MenuItem>
-                    <MenuItem value="event3">Event 3</MenuItem>
-                    </Select>
-                </FormControl>
-                </Box>
-                <Box mx={0.5} my={1}>
-                <FormControl variant="outlined" sx={{ minWidth: 200 }} fullWidth>
-                    <InputLabel id="column-label">Column</InputLabel>
-                    <Select
-                    labelId="column-label"
-                    id="column-select"
-                    value={column}
-                    onChange={handleColumnChange}
-                    label="Column"
-                    >
-                    <MenuItem value="">
-                        <em>None</em>
-                    </MenuItem>
-                    <MenuItem value="column1">Column 1</MenuItem>
-                    <MenuItem value="column2">Column 2</MenuItem>
-                    <MenuItem value="column3">Column 3</MenuItem>
-                    </Select>
-                </FormControl>
-                </Box>
-            </Box>
+        <Box display="flex" justifyContent="space-around" flexWrap="wrap" my={2}>
+        {/* <Box mx={0.5} my={1}>
+          <FormControl variant="outlined" sx={{ minWidth: 200 }} fullWidth>
+            <TextField
+              id="device-search"
+              label="Search Device"
+              variant="outlined"
+              value={searchKeyword}
+              onChange={handleSearchChange}
+              fullWidth
+            />
+          </FormControl>
+        </Box> */}
+      </Box>
         </Container>
         <Table className={classes.table}>
           <TableHead>
@@ -186,7 +96,7 @@ const ImagesPage = () => {
           <TableBody>
             {!loading ? items.filter(filterByKeyword(searchKeyword)).map((item) => (
               <TableRow key={item.id}>
-                <TableCell>{item.description}</TableCell>
+                <TableCell>{item.id}</TableCell>
                 <TableCell>{t(prefixString('event', item.type))}</TableCell>
                 <TableCell>{formatBoolean(item.always, t)}</TableCell>
                 <TableCell>{formatList('alarm', item.attributes.alarms)}</TableCell>
