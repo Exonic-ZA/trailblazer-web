@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import dayjs from 'dayjs';
 import {
   useMediaQuery, Select, MenuItem, FormControl, Button, TextField, Link, Snackbar, IconButton, Tooltip, Box,
@@ -54,6 +54,8 @@ const LoginPage = () => {
   const navigate = useNavigate();
   const theme = useTheme();
   const t = useTranslation();
+  const containerRef = useRef(null);
+  const [backgroundColor, setBackgroundColor] = useState('');
 
   const { languages, language, setLanguage } = useLocalization();
   const languageList = Object.entries(languages).map((values) => ({ code: values[0], country: values[1].country, name: values[1].name }));
@@ -142,6 +144,15 @@ const LoginPage = () => {
     return () => handleLoginTokenListeners.delete(listener);
   }, []);
 
+  useEffect(() => {
+    if(containerRef.current) {
+      console.log('Container ref:', containerRef.current);
+      const bgColor = window.getComputedStyle(containerRef.current.parentElement).backgroundColor;
+      console.log('Background color:', bgColor);
+      setBackgroundColor(bgColor);
+    }
+  }, []);
+
   if (openIdForced) {
     handleOpenIdLogin();
     return (<Loader />);
@@ -172,8 +183,8 @@ const LoginPage = () => {
           </FormControl>
         )}
       </div>
-      <div className={classes.container}>
-        {useMediaQuery(theme.breakpoints.down('lg')) && <LogoImage color={theme.palette.primary.main} />}
+      <div className={classes.container} ref={containerRef}>
+        {useMediaQuery(theme.breakpoints.down('lg')) && <LogoImage color={theme.palette.primary.main} backgroundColor={backgroundColor} />}
         <TextField
           required
           error={failed}
