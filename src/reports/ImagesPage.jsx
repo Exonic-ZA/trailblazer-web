@@ -84,7 +84,9 @@ const ImagesPage = () => {
         setSearchKeyword(event.target.value);
       };
 
-      const filteredItems = items.filter((item) => {
+      const sortedItems = items.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+
+      const filteredItems = sortedItems.filter((item) => {
         const deviceDetails = getDeviceDetails(item.deviceId);
         return (
           deviceDetails.uniqueId.toLowerCase().includes(searchKeyword.toLowerCase()) ||
