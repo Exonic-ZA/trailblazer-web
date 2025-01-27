@@ -91,6 +91,7 @@ const RegisterPage = () => {
           autoComplete="name"
           autoFocus
           onChange={(event) => setName(event.target.value)}
+          inputProps={{ autoCapitalize: 'none' }}
         />
         <TextField
           required
@@ -100,6 +101,7 @@ const RegisterPage = () => {
           value={email}
           autoComplete="email"
           onChange={(event) => setEmail(event.target.value)}
+          inputProps={{ autoCapitalize: 'none' }}
         />
         <TextField
           required
@@ -109,6 +111,7 @@ const RegisterPage = () => {
           type="password"
           autoComplete="current-password"
           onChange={(event) => setPassword(event.target.value)}
+          inputProps={{ autoCapitalize: 'none' }}
         />
         {totpForce && (
           <TextField
