@@ -43,21 +43,8 @@ const ImagesPage = () => {
         }
       }, [timestamp]);
 
-      const getImageUrl = async (id, fileName, fileExtension) => {
-        try {
-          const response = await fetch(`/api/uploads/${id}/${fileName}.${fileExtension}`, {
-            method: 'GET',
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setImageUrl(data.url);
-            console.log("image url:", imageUrl);
-          } else {
-            throw new Error(`Failed to fetch image: ${await response.text()}`);
-          }
-        } catch (error) {
-          console.error('Error fetching image URL:', error);
-        }
+      const getImageUrl =  (id, fileName, fileExtension) => {
+        return `/api/uploads/${id}/${fileName}.${fileExtension}`;
       };
 
       // Get list of devices from server
