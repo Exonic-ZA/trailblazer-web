@@ -32,7 +32,6 @@ const ImagesPage = () => {
           const response = await fetch('/api/images?all=true');
           if (response.ok) {
             const data = await response.json();
-            console.log('API response:', data);
             setItems(data);
             getDevices();
           } else {
@@ -43,21 +42,8 @@ const ImagesPage = () => {
         }
       }, [timestamp]);
 
-      const getImageUrl = async (id, fileName, fileExtension) => {
-        try {
-          const response = await fetch(`/api/uploads/${id}/${fileName}.${fileExtension}`, {
-            method: 'GET',
-          });
-          if (response.ok) {
-            const data = await response.json();
-            setImageUrl(data.url);
-            console.log("image url:", imageUrl);
-          } else {
-            throw new Error(`Failed to fetch image: ${await response.text()}`);
-          }
-        } catch (error) {
-          console.error('Error fetching image URL:', error);
-        }
+      const getImageUrl =  (id, fileName, fileExtension) => {
+        return `/api/uploads/${id}/${fileName}.${fileExtension}`;
       };
 
       // Get list of devices from server
@@ -78,9 +64,9 @@ const ImagesPage = () => {
         }
       };
       
-      const getUniqueIdentifier = (deviceId) => {
+      const getDeviceDetails = (deviceId) => {
         const device = devices.find((it) => it.id === deviceId);
-        return device ? device.uniqueId : '';
+        return device ? { uniqueId: device.uniqueId, name: device.name} : { uniqueId: '', name: '' };
       }
 
       const formatTimestamp = (timestamp) => {
@@ -99,8 +85,11 @@ const ImagesPage = () => {
       };
 
       const filteredItems = items.filter((item) => {
-        const uniqueId = getUniqueIdentifier(item.deviceId);
-        return uniqueId.toLowerCase().includes(searchKeyword.toLowerCase());
+        const deviceDetails = getDeviceDetails(item.deviceId);
+        return (
+          deviceDetails.uniqueId.toLowerCase().includes(searchKeyword.toLowerCase()) ||
+          deviceDetails.name.toLowerCase().includes(searchKeyword.toLowerCase())
+        );
       });
 
       const handleDialogOpen = (imageUrl) => {
@@ -136,7 +125,8 @@ const ImagesPage = () => {
           <TableHead>
             <TableRow>
               <TableCell>{t('imageID')}</TableCell>
-              <TableCell>{t('imageDevice')}</TableCell>
+              <TableCell>{t('imageDeviceName')}</TableCell>
+              <TableCell>{t('imageDeviceIdentifier')}</TableCell>
               <TableCell>{t('imageTimestamp')}</TableCell>
               <TableCell>{t('imageAddress')}</TableCell>
               <TableCell>{t('imagePreview')}</TableCell>
@@ -147,7 +137,8 @@ const ImagesPage = () => {
             {!loading ? filteredItems.map((item) => (
               <TableRow key={item.id}>
                 <TableCell>{item.id}</TableCell>
-                <TableCell>{getUniqueIdentifier(item.deviceId)}</TableCell>
+                <TableCell>{getDeviceDetails(item.deviceId).name}</TableCell>
+                <TableCell>{getDeviceDetails(item.deviceId).uniqueId}</TableCell>
                 <TableCell>{formatTimestamp(item.uploadedAt)}</TableCell>
                 <TableCell>
                   <Link
