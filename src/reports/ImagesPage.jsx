@@ -29,7 +29,7 @@ const ImagesPage = () => {
     useEffectAsync(async () => {
         setLoading(true);
         try {
-          const response = await fetch('/api/images');
+          const response = await fetch('/api/images?all=true');
           if (response.ok) {
             const data = await response.json();
             console.log('API response:', data);
