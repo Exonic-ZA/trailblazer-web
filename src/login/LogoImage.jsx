@@ -5,7 +5,6 @@ import { makeStyles } from '@mui/styles';
 import Logo from '../resources/images/logo.svg?react';
 import DarkModeLogo from '../resources/images/logo-darkmode.svg?react';
 
-
 const useStyles = makeStyles((theme) => ({
   image: {
     alignSelf: 'center',
@@ -17,25 +16,28 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-const LogoImage = ({ color, backgroundColor }) => {
+const LogoImage = ({ color }) => {
   const theme = useTheme();
   const classes = useStyles();
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [isDarkBackground, setIsDarkBackground] = useState(false);
+
+  const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+
+  useEffect(() => {
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(darkModeMediaQuery.matches);
+
+    const handleChange = (e) => setIsDarkMode(e.matches);
+    darkModeMediaQuery.addEventListener('change', handleChange);
+
+    return () => darkModeMediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const expanded = !useMediaQuery(theme.breakpoints.down('lg'));
 
   const logo = useSelector((state) => state.session.server.attributes?.logo);
   const logoInverted = useSelector((state) => state.session.server.attributes?.logoInverted);
-
-  useEffect(() => {
-    if (backgroundColor) {
-      const rgb = backgroundColor.match(/\d+/g);
-      const brightness = Math.round(((parseInt(rgb[0]) * 299) +
-                                    (parseInt(rgb[1]) * 587) +
-                                    (parseInt(rgb[2]) * 114)) / 1000);
-      setIsDarkBackground(brightness < 128);
-    }
-  }, [backgroundColor]);
 
   if (logo) {
     if (expanded && logoInverted) {
@@ -43,10 +45,10 @@ const LogoImage = ({ color, backgroundColor }) => {
     }
     return <img className={classes.image} src={logo} alt="" />;
   }
-  return isDarkBackground ? (
-    <DarkModeLogo className={classes.image} style={{ color }} />
+  return isMobile && isDarkMode ? (
+    <DarkModeLogo className={classes.image} style={{ color: 'white' }} />
   ) : (
-    <Logo className={classes.image} style={{ color }}/>
+    <Logo className={classes.image} style={{ color: isDarkBackground ? 'white' : color }} />
   );
 };
 
