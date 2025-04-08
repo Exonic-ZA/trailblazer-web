@@ -1,8 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme, useMediaQuery } from '@mui/material';
 import { useSelector } from 'react-redux';
 import { makeStyles } from '@mui/styles';
 import Logo from '../resources/images/logo.svg?react';
+import DarkModeLogo from '../resources/images/logo-darkmode.svg?react';
 
 const useStyles = makeStyles((theme) => ({
   image: {
@@ -18,6 +19,20 @@ const useStyles = makeStyles((theme) => ({
 const LogoImage = ({ color }) => {
   const theme = useTheme();
   const classes = useStyles();
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isDarkBackground, setIsDarkBackground] = useState(false);
+
+  const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
+
+  useEffect(() => {
+    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    setIsDarkMode(darkModeMediaQuery.matches);
+
+    const handleChange = (e) => setIsDarkMode(e.matches);
+    darkModeMediaQuery.addEventListener('change', handleChange);
+
+    return () => darkModeMediaQuery.removeEventListener('change', handleChange);
+  }, []);
 
   const expanded = !useMediaQuery(theme.breakpoints.down('lg'));
 
@@ -30,7 +45,11 @@ const LogoImage = ({ color }) => {
     }
     return <img className={classes.image} src={logo} alt="" />;
   }
-  return <Logo className={classes.image} style={{ color }} />;
+  return isMobile && isDarkMode ? (
+    <DarkModeLogo className={classes.image} style={{ color: 'white' }} />
+  ) : (
+    <Logo className={classes.image} style={{ color: isDarkBackground ? 'white' : color }} />
+  );
 };
 
 export default LogoImage;

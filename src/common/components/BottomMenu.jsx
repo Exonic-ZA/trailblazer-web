@@ -9,6 +9,7 @@ import DescriptionIcon from '@mui/icons-material/Description';
 import SettingsIcon from '@mui/icons-material/Settings';
 import MapIcon from '@mui/icons-material/Map';
 import PersonIcon from '@mui/icons-material/Person';
+import ImagesIcon from '@mui/icons-material/Image';
 import ExitToAppIcon from '@mui/icons-material/ExitToApp';
 
 import { sessionActions } from '../../store';
@@ -34,6 +35,8 @@ const BottomMenu = () => {
       return 'account';
     } if (location.pathname.startsWith('/settings')) {
       return 'settings';
+    } if (location.pathname.startsWith('/images')) {
+      return 'reports/images';
     } if (location.pathname.startsWith('/reports')) {
       return 'reports';
     } if (location.pathname === '/') {
@@ -84,6 +87,9 @@ const BottomMenu = () => {
       case 'reports':
         navigate('/reports/combined');
         break;
+      case 'images':
+        navigate('/reports/images');
+        break;
       case 'settings':
         navigate('/settings/preferences');
         break;
@@ -109,15 +115,19 @@ const BottomMenu = () => {
             </Badge>
           )}
           value="map"
+          sx={{ minWidth: 0, padding: '0 10px' }}
         />
         {!disableReports && (
-          <BottomNavigationAction label={t('reportTitle')} icon={<DescriptionIcon />} value="reports" />
+          <BottomNavigationAction label={t('reportTitle')} icon={<DescriptionIcon />} value="reports" sx={{ minWidth: 0, padding: '0 10px' }}/>
         )}
-        <BottomNavigationAction label={t('settingsTitle')} icon={<SettingsIcon />} value="settings" />
+        {!disableReports && (
+          <BottomNavigationAction label={t('imagesTitle')} icon={<ImagesIcon />} value="images" sx={{ minWidth: 0, padding: '0 10px' }}/>
+        )}
+        <BottomNavigationAction label={t('settingsTitle')} icon={<SettingsIcon />} value="settings" sx={{ minWidth: 0, padding: '0 10px' }}/>
         {readonly ? (
-          <BottomNavigationAction label={t('loginLogout')} icon={<ExitToAppIcon />} value="logout" />
+          <BottomNavigationAction label={t('loginLogout')} icon={<ExitToAppIcon />} value="logout" sx={{ minWidth: 0, padding: '0 10px' }}/>
         ) : (
-          <BottomNavigationAction label={t('settingsUser')} icon={<PersonIcon />} value="account" />
+          <BottomNavigationAction label={t('settingsUser')} icon={<PersonIcon />} value="account" sx={{ minWidth: 0, padding: '0 10px' }}/>
         )}
       </BottomNavigation>
       <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>

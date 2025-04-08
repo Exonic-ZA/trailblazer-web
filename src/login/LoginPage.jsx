@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import dayjs from 'dayjs';
 import {
   useMediaQuery, Select, MenuItem, FormControl, Button, TextField, Link, Snackbar, IconButton, Tooltip, Box,
@@ -184,6 +184,7 @@ const LoginPage = () => {
           autoFocus={!email}
           onChange={(e) => setEmail(e.target.value)}
           helperText={failed && 'Invalid username or password'}
+          inputProps={{ autoCapitalize: 'none' }}
         />
         <TextField
           required
@@ -195,6 +196,7 @@ const LoginPage = () => {
           autoComplete="current-password"
           autoFocus={!!email}
           onChange={(e) => setPassword(e.target.value)}
+          inputProps={{ autoCapitalize: 'none' }}
         />
         {codeEnabled && (
           <TextField

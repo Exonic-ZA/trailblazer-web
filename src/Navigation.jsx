@@ -58,6 +58,7 @@ import SharePage from './settings/SharePage';
 import AnnouncementPage from './settings/AnnouncementPage';
 import EmulatorPage from './other/EmulatorPage';
 import Loader from './common/components/Loader';
+import ImagesPage from './reports/ImagesPage';
 
 const Navigation = () => {
   const navigate = useNavigate();
@@ -165,6 +166,7 @@ const Navigation = () => {
           <Route path="scheduled" element={<ScheduledPage />} />
           <Route path="statistics" element={<StatisticsPage />} />
           <Route path="logs" element={<LogsPage />} />
+          <Route path="images" element={<ImagesPage />} />
         </Route>
       </Route>
     </Routes>
