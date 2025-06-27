@@ -19,7 +19,7 @@ export default defineConfig(() => ({
     svgr(),
     react(),
     VitePWA({
-      includeAssets: ['favicon.ico', 'apple-touch-icon-180x180.png'],
+      includeAssets: ['favicon.ico', 'logo-manager.png', 'apple-touch-icon-180x180.png'],
       workbox: {
         navigateFallbackDenylist: [/^\/api/],
         maximumFileSizeToCacheInBytes: 10 * 1024 * 1024,
