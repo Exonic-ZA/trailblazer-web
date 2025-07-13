@@ -20,6 +20,7 @@ const ImagesPage = () => {
   const t = useTranslation();
 
   const devices = useSelector((state) => state.devices.items);
+  const groups = useSelector((state) => state.groups.items);
 
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -51,7 +52,18 @@ const ImagesPage = () => {
 
   const getDeviceDetails = (deviceId) => {
     const device = devices[deviceId];
-    return device ? { uniqueId: device.uniqueId, name: device.name } : { uniqueId: '', name: '' };
+    if (!device) {
+      return { uniqueId: '', name: '', groupName: '' };
+    }
+    
+    const group = device.groupId ? groups[device.groupId] : null;
+    const groupName = group ? group.name : '';
+    
+    return { 
+      uniqueId: device.uniqueId, 
+      name: device.name,
+      groupName: groupName
+    };
   };
 
   const formatTimestamp = (timestamp) => {
@@ -109,6 +121,7 @@ const ImagesPage = () => {
           <TableRow>
             <TableCell>{t('imageID')}</TableCell>
             <TableCell>{t('imageDeviceName')}</TableCell>
+            <TableCell>{t('imageGroupName')}</TableCell>
             <TableCell>{t('imageDeviceIdentifier')}</TableCell>
             <TableCell>{t('imageTimestamp')}</TableCell>
             <TableCell>{t('imageAddress')}</TableCell>
@@ -121,6 +134,7 @@ const ImagesPage = () => {
             <TableRow key={item.id}>
               <TableCell>{item.id}</TableCell>
               <TableCell>{getDeviceDetails(item.deviceId).name}</TableCell>
+              <TableCell>{getDeviceDetails(item.deviceId).groupName}</TableCell>
               <TableCell>{getDeviceDetails(item.deviceId).uniqueId}</TableCell>
               <TableCell>{formatTimestamp(item.uploadedAt)}</TableCell>
               <TableCell>
@@ -143,7 +157,7 @@ const ImagesPage = () => {
               </TableCell>
               <TableCell />
             </TableRow>
-          )) : (<TableShimmer columns={5} endAction />)}
+          )) : (<TableShimmer columns={8} endAction />)}
         </TableBody>
       </Table>
       <Box display="flex" justifyContent="space-between" alignItems="center" my={2}>
