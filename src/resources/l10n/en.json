@@ -549,6 +549,7 @@
     "imageTimestamp": "Timestamp",
     "imageAddress": "Address",
     "imagePreview": "Image Preview",
+    "imageGroupName": "Group Name",
     "reportReplay": "Replay",
     "reportCombined": "Combined",
     "reportRoute": "Route",

@@ -4,6 +4,7 @@ import {
   TextField, Container, Box, FormControl, Link,
   Dialog, DialogContent, DialogTitle, TablePagination, Button
 } from '@mui/material';
+import { useSelector } from 'react-redux';
 import { useEffectAsync } from '../reactHelper';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import PageLayout from '../common/components/PageLayout';
@@ -11,61 +12,58 @@ import ReportsMenu from '../reports/components/ReportsMenu';
 import TableShimmer from '../common/components/TableShimmer';
 import useReportStyles from '../reports/common/useReportStyles';
 import usePersistedState from '../common/util/usePersistedState';
+import ReportFilter from './components/ReportFilter';
+import { useCatch } from '../reactHelper';
 
 const ImagesPage = () => {
   const classes = useReportStyles();
   const t = useTranslation();
 
-  const [timestamp, setTimestamp] = useState(Date.now());
+  const devices = useSelector((state) => state.devices.items);
+  const groups = useSelector((state) => state.groups.items);
+
   const [items, setItems] = useState([]);
-  const [devices, setDevices] = useState([]);
-  const [searchKeyword, setSearchKeyword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [imageUrl, setImageUrl] = useState('');
-  const [showAll, setShowAll] = usePersistedState('showAllDevices', false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogImage, setDialogImage] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
-  useEffectAsync(async () => {
+  const handleSubmit = useCatch(async ({ deviceIds, groupIds, from, to }) => {
+    const query = new URLSearchParams({ from, to });
+    deviceIds.forEach((deviceId) => query.append('deviceId', deviceId));
+    groupIds.forEach((groupId) => query.append('groupId', groupId));
     setLoading(true);
     try {
-      const response = await fetch('/api/images?all=true');
+      const response = await fetch(`/api/images?${query.toString()}`);
       if (response.ok) {
-        const data = await response.json();
-        setItems(data);
-        getDevices();
+        setItems(await response.json());
       } else {
         throw Error(await response.text());
       }
     } finally {
       setLoading(false);
     }
-  }, [timestamp]);
+  });
 
   const getImageUrl = (id, fileName, fileExtension) => {
     return `/api/uploads/${id}/${fileName}.${fileExtension}`;
   };
 
-  const getDevices = async () => {
-    try {
-      const query = new URLSearchParams({ all: showAll });
-      const response = await fetch(`/api/devices?${query.toString()}`);
-      if (response.ok) {
-        const data = await response.json();
-        setDevices(data);
-      } else {
-        throw Error(await response.text());
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const getDeviceDetails = (deviceId) => {
-    const device = devices.find((it) => it.id === deviceId);
-    return device ? { uniqueId: device.uniqueId, name: device.name } : { uniqueId: '', name: '' };
+    const device = devices[deviceId];
+    if (!device) {
+      return { uniqueId: '', name: '', groupName: '' };
+    }
+    
+    const group = device.groupId ? groups[device.groupId] : null;
+    const groupName = group ? group.name : '';
+    
+    return { 
+      uniqueId: device.uniqueId, 
+      name: device.name,
+      groupName: groupName
+    };
   };
 
   const formatTimestamp = (timestamp) => {
@@ -79,18 +77,7 @@ const ImagesPage = () => {
     return `${yyyy}-${mm}-${dd} ${hh}:${min}:${ss}`;
   };
 
-  const handleSearchChange = (event) => {
-    setSearchKeyword(event.target.value);
-  };
   const sortedItems = items.sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
-
-  const filteredItems = sortedItems.filter((item) => {
-    const deviceDetails = getDeviceDetails(item.deviceId);
-    return (
-      deviceDetails.uniqueId.toLowerCase().includes(searchKeyword.toLowerCase()) ||
-      deviceDetails.name.toLowerCase().includes(searchKeyword.toLowerCase())
-    );
-  });
 
   const handleDialogOpen = (imageUrl) => {
     setDialogImage(imageUrl);
@@ -118,34 +105,23 @@ const ImagesPage = () => {
   };
 
   const handleNextPage = () => {
-    if (page < Math.ceil(filteredItems.length / rowsPerPage) - 1) {
+    if (page < Math.ceil(sortedItems.length / rowsPerPage) - 1) {
       setPage(page + 1);
     }
   };
 
   return (
     <PageLayout menu={<ReportsMenu />} breadcrumbs={['reportTitle', 'sharedimages']}>
-      <Container>
-        <Box display="flex" justifyContent="flex-start" flexWrap="wrap" my={2}>
-          <Box mx={0.5} my={1}>
-            <FormControl variant="outlined" sx={{ minWidth: 200 }} fullWidth>
-              <TextField
-                id="device-search"
-                label="Search Device"
-                variant="outlined"
-                value={searchKeyword}
-                onChange={handleSearchChange}
-                fullWidth
-              />
-            </FormControl>
-          </Box>
-        </Box>
-      </Container>
+      <div className={classes.header}>
+        <ReportFilter handleSubmit={handleSubmit} multiDevice includeGroups>
+        </ReportFilter>
+      </div>
       <Table className={classes.table}>
         <TableHead>
           <TableRow>
             <TableCell>{t('imageID')}</TableCell>
             <TableCell>{t('imageDeviceName')}</TableCell>
+            <TableCell>{t('imageGroupName')}</TableCell>
             <TableCell>{t('imageDeviceIdentifier')}</TableCell>
             <TableCell>{t('imageTimestamp')}</TableCell>
             <TableCell>{t('imageAddress')}</TableCell>
@@ -154,10 +130,11 @@ const ImagesPage = () => {
           </TableRow>
         </TableHead>
         <TableBody>
-          {!loading ? filteredItems.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((item) => (
+          {!loading ? sortedItems.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((item) => (
             <TableRow key={item.id}>
               <TableCell>{item.id}</TableCell>
               <TableCell>{getDeviceDetails(item.deviceId).name}</TableCell>
+              <TableCell>{getDeviceDetails(item.deviceId).groupName}</TableCell>
               <TableCell>{getDeviceDetails(item.deviceId).uniqueId}</TableCell>
               <TableCell>{formatTimestamp(item.uploadedAt)}</TableCell>
               <TableCell>
@@ -180,7 +157,7 @@ const ImagesPage = () => {
               </TableCell>
               <TableCell />
             </TableRow>
-          )) : (<TableShimmer columns={5} endAction />)}
+          )) : (<TableShimmer columns={8} endAction />)}
         </TableBody>
       </Table>
       <Box display="flex" justifyContent="space-between" alignItems="center" my={2}>
@@ -190,13 +167,13 @@ const ImagesPage = () => {
         <TablePagination
           rowsPerPageOptions={[10, 25, 50]}
           component="div"
-          count={filteredItems.length}
+          count={sortedItems.length}
           rowsPerPage={rowsPerPage}
           page={page}
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
         />
-        <Button onClick={handleNextPage} disabled={page >= Math.ceil(filteredItems.length / rowsPerPage) - 1}>
+        <Button onClick={handleNextPage} disabled={page >= Math.ceil(sortedItems.length / rowsPerPage) - 1}>
           Next
         </Button>
       </Box>
