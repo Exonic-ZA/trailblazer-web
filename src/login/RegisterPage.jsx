@@ -1,18 +1,17 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import {
-  Button, TextField, Typography, Snackbar, IconButton,
-} from '@mui/material';
-import makeStyles from '@mui/styles/makeStyles';
+import { Button, TextField, Typography, Snackbar, IconButton } from '@mui/material';
+import { makeStyles } from 'tss-react/mui';
 import { useNavigate } from 'react-router-dom';
-import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import LoginLayout from './LoginLayout';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import { snackBarDurationShortMs } from '../common/util/duration';
-import { useCatch, useEffectAsync } from '../reactHelper';
+import { useCatch, useAsyncTask } from '../reactHelper';
 import { sessionActions } from '../store';
+import BackIcon from '../common/components/BackIcon';
+import fetchOrThrow from '../common/util/fetchOrThrow';
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
   container: {
     display: 'flex',
     flexDirection: 'column',
@@ -31,7 +30,7 @@ const useStyles = makeStyles((theme) => ({
 }));
 
 const RegisterPage = () => {
-  const classes = useStyles();
+  const { classes } = useStyles();
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const t = useTranslation();
@@ -45,29 +44,24 @@ const RegisterPage = () => {
   const [totpKey, setTotpKey] = useState(null);
   const [snackbarOpen, setSnackbarOpen] = useState(false);
 
-  useEffectAsync(async () => {
-    if (totpForce) {
-      const response = await fetch('/api/users/totp', { method: 'POST' });
-      if (response.ok) {
+  useAsyncTask(
+    async ({ signal }) => {
+      if (totpForce) {
+        const response = await fetchOrThrow('/api/users/totp', { method: 'POST', signal });
         setTotpKey(await response.text());
-      } else {
-        throw Error(await response.text());
       }
-    }
-  }, [totpForce, setTotpKey]);
+    },
+    [totpForce, setTotpKey],
+  );
 
   const handleSubmit = useCatch(async (event) => {
     event.preventDefault();
-    const response = await fetch('/api/users', {
+    await fetchOrThrow('/api/users', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name, email, password, totpKey }),
     });
-    if (response.ok) {
-      setSnackbarOpen(true);
-    } else {
-      throw Error(await response.text());
-    }
+    setSnackbarOpen(true);
   });
 
   return (
@@ -76,7 +70,7 @@ const RegisterPage = () => {
         <div className={classes.header}>
           {!server.newServer && (
             <IconButton color="primary" onClick={() => navigate('/login')}>
-              <ArrowBackIcon />
+              <BackIcon />
             </IconButton>
           )}
           <Typography className={classes.title} color="primary">
@@ -91,7 +85,7 @@ const RegisterPage = () => {
           autoComplete="name"
           autoFocus
           onChange={(event) => setName(event.target.value)}
-          inputProps={{ autoCapitalize: 'none' }}
+          slotProps={{ htmlInput: { autoCapitalize: 'none' } }}
         />
         <TextField
           required
@@ -101,7 +95,7 @@ const RegisterPage = () => {
           value={email}
           autoComplete="email"
           onChange={(event) => setEmail(event.target.value)}
-          inputProps={{ autoCapitalize: 'none' }}
+          slotProps={{ htmlInput: { autoCapitalize: 'none' } }}
         />
         <TextField
           required
@@ -111,7 +105,7 @@ const RegisterPage = () => {
           type="password"
           autoComplete="current-password"
           onChange={(event) => setPassword(event.target.value)}
-          inputProps={{ autoCapitalize: 'none' }}
+          slotProps={{ htmlInput: { autoCapitalize: 'none' } }}
         />
         {totpForce && (
           <TextField
@@ -119,8 +113,8 @@ const RegisterPage = () => {
             label={t('loginTotpKey')}
             name="totpKey"
             value={totpKey || ''}
-            InputProps={{
-              readOnly: true,
+            slotProps={{
+              input: { readOnly: true },
             }}
           />
         )}

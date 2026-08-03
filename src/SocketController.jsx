@@ -1,30 +1,48 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { useDispatch, useSelector, connect } from 'react-redux';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import { Snackbar } from '@mui/material';
 import { devicesActions, sessionActions } from './store';
-import { useEffectAsync } from './reactHelper';
-import { useTranslation } from './common/components/LocalizationProvider';
+import { useCatchCallback, useAsyncTask } from './reactHelper';
 import { snackBarDurationLongMs } from './common/util/duration';
 import alarm from './resources/alarm.mp3';
 import { eventsActions } from './store/events';
 import useFeatures from './common/util/useFeatures';
 import { useAttributePreference } from './common/util/preferences';
+import {
+  handleNativeNotificationListeners,
+  nativePostMessage,
+} from './common/components/NativeInterface';
+import fetchOrThrow from './common/util/fetchOrThrow';
 
 const logoutCode = 4000;
+
+let alarmAudio;
+const playAlarm = () => {
+  if (!alarmAudio) {
+    alarmAudio = new Audio(alarm);
+  }
+  alarmAudio.currentTime = 0;
+  alarmAudio.play();
+};
 
 const SocketController = () => {
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const t = useTranslation();
 
-  const authenticated = useSelector((state) => !!state.session.user);
-  const devices = useSelector((state) => state.devices.items);
+  const authenticated = useSelector((state) => Boolean(state.session.user));
   const includeLogs = useSelector((state) => state.session.includeLogs);
 
   const socketRef = useRef();
+  const reconnectTimeoutRef = useRef();
 
-  const [events, setEvents] = useState([]);
+  const clearReconnectTimeout = useCallback(() => {
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+      reconnectTimeoutRef.current = null;
+    }
+  }, []);
+
   const [notifications, setNotifications] = useState([]);
 
   const soundEvents = useAttributePreference('soundEvents', '');
@@ -32,7 +50,41 @@ const SocketController = () => {
 
   const features = useFeatures();
 
-  const connectSocket = () => {
+  const handleEvents = useCallback(
+    (events) => {
+      if (!features.disableEvents) {
+        dispatch(eventsActions.add(events));
+      }
+      if (
+        events.some(
+          (e) =>
+            soundEvents.includes(e.type) ||
+            (e.type === 'alarm' && soundAlarms.includes(e.attributes.alarm)),
+        )
+      ) {
+        playAlarm();
+      }
+      setNotifications(
+        events.map((event) => ({
+          id: event.id,
+          message: event.attributes.message,
+          show: true,
+        })),
+      );
+    },
+    [features, dispatch, soundEvents, soundAlarms],
+  );
+
+  const handleEventsRef = useRef(handleEvents);
+  handleEventsRef.current = handleEvents;
+
+  const connectSocketRef = useRef();
+
+  const connectSocket = useCallback(() => {
+    clearReconnectTimeout();
+    if (socketRef.current && socketRef.current.readyState !== WebSocket.CLOSED) {
+      socketRef.current.close();
+    }
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const socket = new WebSocket(`${protocol}//${window.location.host}/api/socket`);
     socketRef.current = socket;
@@ -43,24 +95,30 @@ const SocketController = () => {
 
     socket.onclose = async (event) => {
       dispatch(sessionActions.updateSocket(false));
-      if (event.code !== logoutCode) {
-        try {
-          const devicesResponse = await fetch('/api/devices');
-          if (devicesResponse.ok) {
-            dispatch(devicesActions.update(await devicesResponse.json()));
-          }
-          const positionsResponse = await fetch('/api/positions');
-          if (positionsResponse.ok) {
-            dispatch(sessionActions.updatePositions(await positionsResponse.json()));
-          }
-          if (devicesResponse.status === 401 || positionsResponse.status === 401) {
-            navigate('/login');
-          }
-        } catch (error) {
-          // ignore errors
+      if (event.code === logoutCode) return;
+      try {
+        const devicesResponse = await fetch('/api/devices');
+        if (socketRef.current !== socket) return;
+        if (devicesResponse.ok) {
+          dispatch(devicesActions.update(await devicesResponse.json()));
         }
-        setTimeout(() => connectSocket(), 60000);
+        const positionsResponse = await fetch('/api/positions');
+        if (socketRef.current !== socket) return;
+        if (positionsResponse.ok) {
+          dispatch(sessionActions.updatePositions(await positionsResponse.json()));
+        }
+        if (devicesResponse.status === 401 || positionsResponse.status === 401) {
+          navigate('/login');
+        }
+      } catch {
+        // ignore errors
       }
+      if (socketRef.current !== socket) return;
+      clearReconnectTimeout();
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectTimeoutRef.current = null;
+        connectSocketRef.current?.();
+      }, 60000);
     };
 
     socket.onmessage = (event) => {
@@ -72,55 +130,86 @@ const SocketController = () => {
         dispatch(sessionActions.updatePositions(data.positions));
       }
       if (data.events) {
-        if (!features.disableEvents) {
-          dispatch(eventsActions.add(data.events));
-        }
-        setEvents(data.events);
+        handleEventsRef.current(data.events);
       }
       if (data.logs) {
         dispatch(sessionActions.updateLogs(data.logs));
       }
     };
-  };
+  }, [clearReconnectTimeout, dispatch, navigate]);
+
+  connectSocketRef.current = connectSocket;
 
   useEffect(() => {
     socketRef.current?.send(JSON.stringify({ logs: includeLogs }));
-  }, [socketRef, includeLogs]);
+  }, [includeLogs]);
 
-  useEffectAsync(async () => {
-    if (authenticated) {
-      const response = await fetch('/api/devices');
-      if (response.ok) {
+  useAsyncTask(
+    async ({ signal }) => {
+      if (authenticated) {
+        const response = await fetchOrThrow('/api/devices', { signal });
         dispatch(devicesActions.refresh(await response.json()));
-      } else {
-        throw Error(await response.text());
+        nativePostMessage('authenticated');
+        connectSocket();
+        return () => {
+          clearReconnectTimeout();
+          socketRef.current?.close(logoutCode);
+        };
       }
-      connectSocket();
-      return () => {
-        const socket = socketRef.current;
-        if (socket) {
-          socket.close(logoutCode);
+      return null;
+    },
+    [authenticated, dispatch, clearReconnectTimeout, connectSocket],
+  );
+
+  const handleNativeNotification = useCatchCallback(
+    async (message) => {
+      const eventId = message.data.eventId;
+      if (eventId) {
+        const response = await fetch(`/api/events/${eventId}`);
+        if (response.ok) {
+          const event = await response.json();
+          const eventWithMessage = {
+            ...event,
+            attributes: { ...event.attributes, message: message.notification.body },
+          };
+          handleEvents([eventWithMessage]);
         }
-      };
-    }
-    return null;
-  }, [authenticated]);
-
-  useEffect(() => {
-    setNotifications(events.map((event) => ({
-      id: event.id,
-      message: event.attributes.message,
-      show: true,
-    })));
-  }, [events, devices, t]);
-
-  useEffect(() => {
-    events.forEach((event) => {
-      if (soundEvents.includes(event.type) || (event.type === 'alarm' && soundAlarms.includes(event.attributes.alarm))) {
-        new Audio(alarm).play();
       }
-    });
-  }, [events, soundEvents, soundAlarms]);
+    },
+    [handleEvents],
+  );
+
+  useEffect(() => {
+    handleNativeNotificationListeners.add(handleNativeNotification);
+    return () => handleNativeNotificationListeners.delete(handleNativeNotification);
+  }, [handleNativeNotification]);
+
+  useEffect(() => {
+    if (!authenticated) return;
+    const reconnectIfNeeded = () => {
+      const socket = socketRef.current;
+      if (!socket || socket.readyState === WebSocket.CLOSED) {
+        connectSocket();
+      } else if (socket.readyState === WebSocket.OPEN) {
+        try {
+          socket.send('{}');
+        } catch {
+          // test connection
+        }
+      }
+    };
+    const onVisibility = () => {
+      if (!document.hidden) {
+        reconnectIfNeeded();
+      }
+    };
+    window.addEventListener('online', reconnectIfNeeded);
+    document.addEventListener('visibilitychange', onVisibility);
+    return () => {
+      window.removeEventListener('online', reconnectIfNeeded);
+      document.removeEventListener('visibilitychange', onVisibility);
+    };
+  }, [authenticated, connectSocket]);
 
   return (
     <>
@@ -130,11 +219,11 @@ const SocketController = () => {
           open={notification.show}
           message={notification.message}
           autoHideDuration={snackBarDurationLongMs}
-          onClose={() => setEvents(events.filter((e) => e.id !== notification.id))}
+          onClose={() => setNotifications((prev) => prev.filter((e) => e.id !== notification.id))}
         />
       ))}
     </>
   );
 };
 
-export default connect()(SocketController);
+export default SocketController;
