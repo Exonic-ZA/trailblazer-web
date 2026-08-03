@@ -1,16 +1,37 @@
 import { useEffect, useState } from 'react';
+import dayjs from 'dayjs';
 import { useDispatch, useSelector } from 'react-redux';
-import { useEffectAsync } from '../../reactHelper';
+import { useAsyncTask } from '../../reactHelper';
 import { sessionActions } from '../../store';
+import fetchOrThrow from '../util/fetchOrThrow';
 
-export const nativeEnvironment = window.appInterface || (window.webkit && window.webkit.messageHandlers.appInterface);
+export const nativeEnvironment =
+  window.appInterface || (window.webkit && window.webkit.messageHandlers.appInterface);
 
 export const nativePostMessage = (message) => {
   if (window.webkit && window.webkit.messageHandlers.appInterface) {
     window.webkit.messageHandlers.appInterface.postMessage(message);
-  }
-  if (window.appInterface) {
+  } else if (window.appInterface) {
     window.appInterface.postMessage(message);
+  }
+};
+
+export const generateLoginToken = async () => {
+  if (nativeEnvironment) {
+    let token = '';
+    try {
+      const expiration = dayjs().add(6, 'months').toISOString();
+      const response = await fetch('/api/session/token', {
+        method: 'POST',
+        body: new URLSearchParams(`expiration=${expiration}`),
+      });
+      if (response.ok) {
+        token = await response.text();
+      }
+    } catch {
+      token = '';
+    }
+    nativePostMessage(`login|${token}`);
   }
 };
 
@@ -22,6 +43,11 @@ window.handleLoginToken = (token) => {
 const updateNotificationTokenListeners = new Set();
 window.updateNotificationToken = (token) => {
   updateNotificationTokenListeners.forEach((listener) => listener(token));
+};
+
+export const handleNativeNotificationListeners = new Set();
+window.handleNativeNotification = (message) => {
+  handleNativeNotificationListeners.forEach((listener) => listener(message));
 };
 
 const NativeInterface = () => {
@@ -36,35 +62,34 @@ const NativeInterface = () => {
     return () => updateNotificationTokenListeners.delete(listener);
   }, [setNotificationToken]);
 
-  useEffectAsync(async () => {
-    if (user && notificationToken) {
-      window.localStorage.setItem('notificationToken', notificationToken);
-      setNotificationToken(null);
+  useAsyncTask(
+    async ({ signal }) => {
+      if (user && notificationToken) {
+        window.localStorage.setItem('notificationToken', notificationToken);
 
-      const tokens = user.attributes.notificationTokens?.split(',') || [];
-      if (!tokens.includes(notificationToken)) {
-        const updatedUser = {
-          ...user,
-          attributes: {
-            ...user.attributes,
-            notificationTokens: [...tokens.slice(-2), notificationToken].join(','),
-          },
-        };
+        const tokens = user.attributes.notificationTokens?.split(',') || [];
+        if (!tokens.includes(notificationToken)) {
+          const updatedUser = {
+            ...user,
+            attributes: {
+              ...user.attributes,
+              notificationTokens: [...tokens.slice(-2), notificationToken].join(','),
+            },
+          };
 
-        const response = await fetch(`/api/users/${user.id}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedUser),
-        });
-
-        if (response.ok) {
+          const response = await fetchOrThrow(`/api/users/${user.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(updatedUser),
+            signal,
+          });
           dispatch(sessionActions.updateUser(await response.json()));
-        } else {
-          throw Error(await response.text());
         }
+        setNotificationToken(null);
       }
-    }
-  }, [user, notificationToken, setNotificationToken]);
+    },
+    [user, notificationToken, setNotificationToken, dispatch],
+  );
 
   return null;
 };

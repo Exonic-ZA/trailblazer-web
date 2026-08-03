@@ -1,27 +1,27 @@
-// eslint-disable-next-line import/no-unresolved
-import mapboxglRtlTextUrl from '@mapbox/mapbox-gl-rtl-text/mapbox-gl-rtl-text.min?url';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import maplibregl from 'maplibre-gl';
 import { googleProtocol } from 'maplibre-google-maps';
-import React, {
-  useRef, useLayoutEffect, useEffect, useState,
-} from 'react';
-import { SwitcherControl } from '../switcher/switcher';
+import { Protocol } from 'pmtiles';
+import { useRef, useLayoutEffect, useEffect, useState, useMemo } from 'react';
+import { useTheme } from '@mui/material';
+import MapSwitcher from '../control/MapSwitcher';
 import { useAttributePreference, usePreference } from '../../common/util/preferences';
-import usePersistedState, { savePersistedState } from '../../common/util/usePersistedState';
+import usePersistedState from '../../common/util/usePersistedState';
 import { mapImages } from './preloadImages';
 import useMapStyles from './useMapStyles';
+import { useAsyncTask } from '../../reactHelper';
 
 const element = document.createElement('div');
 element.style.width = '100%';
 element.style.height = '100%';
 element.style.boxSizing = 'initial';
 
-maplibregl.setRTLTextPlugin(mapboxglRtlTextUrl);
 maplibregl.addProtocol('google', googleProtocol);
+maplibregl.addProtocol('pmtiles', new Protocol().tile);
 
 export const map = new maplibregl.Map({
   container: element,
+  attributionControl: false,
 });
 
 let ready = false;
@@ -50,40 +50,48 @@ const initMap = async () => {
       });
     });
   }
-  updateReadyValue(true);
 };
 
-map.addControl(new maplibregl.NavigationControl());
-
-const switcher = new SwitcherControl(
-  () => updateReadyValue(false),
-  (styleId) => savePersistedState('selectedMapStyle', styleId),
-  () => {
-    map.once('styledata', () => {
-      const waiting = () => {
-        if (!map.loaded()) {
-          setTimeout(waiting, 33);
-        } else {
-          initMap();
-        }
-      };
-      waiting();
-    });
-  },
-);
-
-map.addControl(switcher);
-
 const MapView = ({ children }) => {
-  const containerEl = useRef(null);
+  const theme = useTheme();
+
+  const containerRef = useRef(null);
 
   const [mapReady, setMapReady] = useState(false);
 
   const mapStyles = useMapStyles();
-  const activeMapStyles = useAttributePreference('activeMapStyles', 'locationIqStreets,locationIqDark,openFreeMap');
-  const [defaultMapStyle] = usePersistedState('selectedMapStyle', usePreference('map', 'locationIqStreets'));
+  const activeMapStyles = useAttributePreference(
+    'activeMapStyles',
+    'locationIqStreets,locationIqDark,openFreeMap',
+  );
+  const [selectedStyleId, setSelectedStyleId] = usePersistedState(
+    'selectedMapStyle',
+    usePreference('map', 'locationIqStreets'),
+  );
   const mapboxAccessToken = useAttributePreference('mapboxAccessToken');
   const maxZoom = useAttributePreference('web.maxZoom');
+
+  const styles = useMemo(() => {
+    const filtered = mapStyles.filter((s) => s.available && activeMapStyles.includes(s.id));
+    return filtered.length ? filtered : mapStyles.filter((s) => s.id === 'osm');
+  }, [mapStyles, activeMapStyles]);
+
+  useAsyncTask(async () => {
+    if (theme.direction === 'rtl') {
+      maplibregl.setRTLTextPlugin('/mapbox-gl-rtl-text.js');
+    }
+  }, [theme.direction]);
+
+  useEffect(() => {
+    const attribution = new maplibregl.AttributionControl({ compact: true });
+    const navigation = new maplibregl.NavigationControl();
+    map.addControl(attribution, theme.direction === 'rtl' ? 'bottom-left' : 'bottom-right');
+    map.addControl(navigation, theme.direction === 'rtl' ? 'top-left' : 'top-right');
+    return () => {
+      map.removeControl(navigation);
+      map.removeControl(attribution);
+    };
+  }, [theme.direction]);
 
   useEffect(() => {
     if (maxZoom) {
@@ -96,10 +104,27 @@ const MapView = ({ children }) => {
   }, [mapboxAccessToken]);
 
   useEffect(() => {
-    const filteredStyles = mapStyles.filter((s) => s.available && activeMapStyles.includes(s.id));
-    const styles = filteredStyles.length ? filteredStyles : mapStyles.filter((s) => s.id === 'osm');
-    switcher.updateStyles(styles, defaultMapStyle);
-  }, [mapStyles, defaultMapStyle]);
+    const style = styles.find((s) => s.id === selectedStyleId);
+    if (!style) {
+      setSelectedStyleId(styles[0].id);
+      return;
+    }
+    updateReadyValue(false);
+    map.coordinateSystem = style.coordinateSystem;
+    map.setStyle(style.style, { diff: false });
+    map.setTransformRequest(style.transformRequest);
+    let timeoutId;
+    const waiting = () => {
+      if (!map.loaded()) {
+        timeoutId = setTimeout(waiting, 33);
+      } else {
+        initMap();
+        updateReadyValue(true);
+      }
+    };
+    map.once('styledata', waiting);
+    return () => clearTimeout(timeoutId);
+  }, [styles, selectedStyleId, setSelectedStyleId]);
 
   useEffect(() => {
     const listener = (ready) => setMapReady(ready);
@@ -110,16 +135,17 @@ const MapView = ({ children }) => {
   }, []);
 
   useLayoutEffect(() => {
-    const currentEl = containerEl.current;
+    const currentEl = containerRef.current;
     currentEl.appendChild(element);
     map.resize();
     return () => {
       currentEl.removeChild(element);
     };
-  }, [containerEl]);
+  }, [containerRef]);
 
   return (
-    <div style={{ width: '100%', height: '100%' }} ref={containerEl}>
+    <div style={{ width: '100%', height: '100%' }} ref={containerRef}>
+      <MapSwitcher styles={styles} selectedId={selectedStyleId} onSelect={setSelectedStyleId} />
       {mapReady && children}
     </div>
   );

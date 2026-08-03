@@ -1,11 +1,10 @@
-import React, { useEffect, useState } from 'react';
 import { useTheme, useMediaQuery } from '@mui/material';
 import { useSelector } from 'react-redux';
-import { makeStyles } from '@mui/styles';
+import { makeStyles } from 'tss-react/mui';
 import Logo from '../resources/images/logo.svg?react';
 import DarkModeLogo from '../resources/images/logo-darkmode.svg?react';
 
-const useStyles = makeStyles((theme) => ({
+const useStyles = makeStyles()((theme) => ({
   image: {
     alignSelf: 'center',
     maxWidth: '240px',
@@ -18,21 +17,7 @@ const useStyles = makeStyles((theme) => ({
 
 const LogoImage = ({ color }) => {
   const theme = useTheme();
-  const classes = useStyles();
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [isDarkBackground, setIsDarkBackground] = useState(false);
-
-  const isMobile = useMediaQuery(theme.breakpoints.down('lg'));
-
-  useEffect(() => {
-    const darkModeMediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    setIsDarkMode(darkModeMediaQuery.matches);
-
-    const handleChange = (e) => setIsDarkMode(e.matches);
-    darkModeMediaQuery.addEventListener('change', handleChange);
-
-    return () => darkModeMediaQuery.removeEventListener('change', handleChange);
-  }, []);
+  const { classes } = useStyles();
 
   const expanded = !useMediaQuery(theme.breakpoints.down('lg'));
 
@@ -45,11 +30,15 @@ const LogoImage = ({ color }) => {
     }
     return <img className={classes.image} src={logo} alt="" />;
   }
-  return isMobile && isDarkMode ? (
-    <DarkModeLogo className={classes.image} style={{ color: 'white' }} />
-  ) : (
-    <Logo className={classes.image} style={{ color: isDarkBackground ? 'white' : color }} />
-  );
+
+  // On the narrow (mobile) login layout the logo sits on a dark surface. Some
+  // mobile browsers (notably non-Chromium and Edge) do not apply the inline
+  // `color` to the inlined SVG, so use a dedicated light-on-dark asset instead
+  // of relying on `currentColor`.
+  if (!expanded && theme.palette.mode === 'dark') {
+    return <DarkModeLogo className={classes.image} />;
+  }
+  return <Logo className={classes.image} style={{ color }} />;
 };
 
 export default LogoImage;
