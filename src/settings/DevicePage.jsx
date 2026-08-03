@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Accordion,
   AccordionSummary,
@@ -7,47 +8,52 @@ import {
   FormControlLabel,
   Checkbox,
   TextField,
+  Button,
 } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { DropzoneArea } from 'react-mui-dropzone';
+import FileInput from '../common/components/FileInput';
 import EditItemView from './components/EditItemView';
 import EditAttributesAccordion from './components/EditAttributesAccordion';
 import SelectField from '../common/components/SelectField';
 import deviceCategories from '../common/util/deviceCategories';
 import { useTranslation } from '../common/components/LocalizationProvider';
 import useDeviceAttributes from '../common/attributes/useDeviceAttributes';
-import { useAdministrator } from '../common/util/permissions';
+import { useManager } from '../common/util/permissions';
 import SettingsMenu from './components/SettingsMenu';
 import useCommonDeviceAttributes from '../common/attributes/useCommonDeviceAttributes';
 import { useCatch } from '../reactHelper';
-import useQuery from '../common/util/useQuery';
 import useSettingsStyles from './common/useSettingsStyles';
+import QrCodeDialog from '../common/components/QrCodeDialog';
+import fetchOrThrow from '../common/util/fetchOrThrow';
 
 const DevicePage = () => {
-  const classes = useSettingsStyles();
+  const { classes } = useSettingsStyles();
   const t = useTranslation();
 
-  const admin = useAdministrator();
+  const manager = useManager();
 
   const commonDeviceAttributes = useCommonDeviceAttributes(t);
   const deviceAttributes = useDeviceAttributes(t);
 
-  const query = useQuery();
-  const uniqueId = query.get('uniqueId');
+  const [searchParams] = useSearchParams();
+  const uniqueId = searchParams.get('uniqueId');
 
   const [item, setItem] = useState(uniqueId ? { uniqueId } : null);
+  const [showQr, setShowQr] = useState(false);
+  const [imageFile, setImageFile] = useState(null);
 
-  const handleFiles = useCatch(async (files) => {
-    if (files.length > 0) {
-      const response = await fetch(`/api/devices/${item.id}/image`, {
+  const handleFileInput = useCatch(async (newFile) => {
+    setImageFile(newFile);
+    if (newFile && item?.id) {
+      const response = await fetchOrThrow(`/api/devices/${item.id}/image`, {
         method: 'POST',
-        body: files[0],
+        body: newFile,
       });
-      if (response.ok) {
-        setItem({ ...item, attributes: { ...item.attributes, deviceImage: await response.text() } });
-      } else {
-        throw Error(await response.text());
-      }
+      setItem({ ...item, attributes: { ...item.attributes, deviceImage: await response.text() } });
+    } else if (!newFile) {
+      // eslint-disable-next-line no-unused-vars
+      const { deviceImage, ...remainingAttributes } = item.attributes || {};
+      setItem({ ...item, attributes: remainingAttributes });
     }
   });
 
@@ -66,9 +72,7 @@ const DevicePage = () => {
         <>
           <Accordion defaultExpanded>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">
-                {t('sharedRequired')}
-              </Typography>
+              <Typography variant="subtitle1">{t('sharedRequired')}</Typography>
             </AccordionSummary>
             <AccordionDetails className={classes.details}>
               <TextField
@@ -87,9 +91,7 @@ const DevicePage = () => {
           </Accordion>
           <Accordion>
             <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-              <Typography variant="subtitle1">
-                {t('sharedExtra')}
-              </Typography>
+              <Typography variant="subtitle1">{t('sharedExtra')}</Typography>
             </AccordionSummary>
             <AccordionDetails className={classes.details}>
               <SelectField
@@ -116,10 +118,12 @@ const DevicePage = () => {
               <SelectField
                 value={item.category || 'default'}
                 onChange={(event) => setItem({ ...item, category: event.target.value })}
-                data={deviceCategories.map((category) => ({
-                  id: category,
-                  name: t(`category${category.replace(/^\w/, (c) => c.toUpperCase())}`),
-                }))}
+                data={deviceCategories
+                  .map((category) => ({
+                    id: category,
+                    name: t(`category${category.replace(/^\w/, (c) => c.toUpperCase())}`),
+                  }))
+                  .sort((a, b) => a.name.localeCompare(b.name))}
                 label={t('deviceCategory')}
               />
               <SelectField
@@ -137,30 +141,34 @@ const DevicePage = () => {
                     setItem({ ...item, expirationTime: new Date(e.target.value).toISOString() });
                   }
                 }}
-                disabled={!admin}
+                disabled={!manager}
               />
               <FormControlLabel
-                control={<Checkbox checked={item.disabled} onChange={(event) => setItem({ ...item, disabled: event.target.checked })} />}
+                control={
+                  <Checkbox
+                    checked={item.disabled}
+                    onChange={(event) => setItem({ ...item, disabled: event.target.checked })}
+                  />
+                }
                 label={t('sharedDisabled')}
-                disabled={!admin}
+                disabled={!manager}
               />
+              <Button variant="outlined" color="primary" onClick={() => setShowQr(true)}>
+                {t('sharedQrCode')}
+              </Button>
             </AccordionDetails>
           </Accordion>
           {item.id && (
             <Accordion>
               <AccordionSummary expandIcon={<ExpandMoreIcon />}>
-                <Typography variant="subtitle1">
-                  {t('attributeDeviceImage')}
-                </Typography>
+                <Typography variant="subtitle1">{t('attributeDeviceImage')}</Typography>
               </AccordionSummary>
               <AccordionDetails className={classes.details}>
-                <DropzoneArea
-                  dropzoneText={t('sharedDropzoneText')}
-                  acceptedFiles={['image/*']}
-                  filesLimit={1}
-                  onChange={handleFiles}
-                  showAlerts={false}
-                  maxFileSize={500000}
+                <FileInput
+                  placeholder={t('attributeDeviceImage')}
+                  value={imageFile}
+                  onChange={handleFileInput}
+                  slotProps={{ htmlInput: { accept: 'image/*' } }}
                 />
               </AccordionDetails>
             </Accordion>
@@ -172,6 +180,7 @@ const DevicePage = () => {
           />
         </>
       )}
+      <QrCodeDialog open={showQr} onClose={() => setShowQr(false)} />
     </EditItemView>
   );
 };

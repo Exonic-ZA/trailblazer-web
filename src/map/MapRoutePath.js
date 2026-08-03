@@ -1,8 +1,10 @@
-import { useTheme } from '@mui/styles';
+import { useTheme } from '@mui/material/styles';
 import { useId, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { map } from './core/MapView';
 import getSpeedColor from '../common/util/colors';
+import { useAttributePreference } from '../common/util/preferences';
+import { toMapCoordinates } from './core/mapUtil';
 
 const MapRoutePath = ({ positions }) => {
   const id = useId();
@@ -22,6 +24,9 @@ const MapRoutePath = ({ positions }) => {
     }
     return null;
   });
+
+  const mapLineWidth = useAttributePreference('mapLineWidth', 2);
+  const mapLineOpacity = useAttributePreference('mapLineOpacity', 1);
 
   useEffect(() => {
     map.addSource(id, {
@@ -44,14 +49,12 @@ const MapRoutePath = ({ positions }) => {
       },
       paint: {
         'line-color': ['get', 'color'],
-        'line-width': 2,
+        'line-width': ['get', 'width'],
+        'line-opacity': ['get', 'opacity'],
       },
     });
 
     return () => {
-      if (map.getLayer(`${id}-title`)) {
-        map.removeLayer(`${id}-title`);
-      }
       if (map.getLayer(`${id}-line`)) {
         map.removeLayer(`${id}-line`);
       }
@@ -59,7 +62,7 @@ const MapRoutePath = ({ positions }) => {
         map.removeSource(id);
       }
     };
-  }, []);
+  }, [id]);
 
   useEffect(() => {
     const minSpeed = positions.map((p) => p.speed).reduce((a, b) => Math.min(a, b), Infinity);
@@ -70,14 +73,15 @@ const MapRoutePath = ({ positions }) => {
         type: 'Feature',
         geometry: {
           type: 'LineString',
-          coordinates: [[positions[i].longitude, positions[i].latitude], [positions[i + 1].longitude, positions[i + 1].latitude]],
+          coordinates: [
+            toMapCoordinates(positions[i].longitude, positions[i].latitude),
+            toMapCoordinates(positions[i + 1].longitude, positions[i + 1].latitude),
+          ],
         },
         properties: {
-          color: reportColor || getSpeedColor(
-            positions[i + 1].speed,
-            minSpeed,
-            maxSpeed,
-          ),
+          color: reportColor || getSpeedColor(positions[i + 1].speed, minSpeed, maxSpeed),
+          width: mapLineWidth,
+          opacity: mapLineOpacity,
         },
       });
     }
@@ -85,7 +89,7 @@ const MapRoutePath = ({ positions }) => {
       type: 'FeatureCollection',
       features,
     });
-  }, [theme, positions, reportColor]);
+  }, [theme, positions, reportColor, mapLineWidth, mapLineOpacity, id]);
 
   return null;
 };
